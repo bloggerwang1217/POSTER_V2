@@ -1,5 +1,5 @@
 # A lite validation of your chosen model on the Taiwanese face images on COOL
-data
+data/Taiwanese
 checkpoint
 
 # DS stores
