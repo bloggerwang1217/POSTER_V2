@@ -245,9 +245,6 @@ class pyramid_trans_expr2(nn.Module):
         self.window_size = window_size
         self.N = [win * win for win in window_size]
         self.face_landback = MobileFaceNet([112, 112], 136)
-        face_landback_checkpoint = torch.load(r'./pretrain/mobilefacenet_model_best.pth.tar',
-                                              map_location=lambda storage, loc: storage)
-        self.face_landback.load_state_dict(face_landback_checkpoint['state_dict'])
 
         for param in self.face_landback.parameters():
             param.requires_grad = False
@@ -255,9 +252,6 @@ class pyramid_trans_expr2(nn.Module):
         self.VIT = VisionTransformer(depth=2, embed_dim=embed_dim, num_classes=num_classes)
 
         self.ir_back = Backbone(50, 0.0, 'ir')
-        ir_checkpoint = torch.load(r'./pretrain/ir50.pth', map_location=lambda storage, loc: storage)
-
-        self.ir_back = load_pretrained_weights(self.ir_back, ir_checkpoint)
 
         self.attn1 = WindowAttentionGlobal(dim=dims[0], num_heads=num_heads[0], window_size=window_size[0])
         self.attn2 = WindowAttentionGlobal(dim=dims[1], num_heads=num_heads[1], window_size=window_size[1])

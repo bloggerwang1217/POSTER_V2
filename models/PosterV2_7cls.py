@@ -1,3 +1,4 @@
+import os
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
@@ -247,9 +248,12 @@ class pyramid_trans_expr2(nn.Module):
         self.window_size = window_size
         self.N = [win * win for win in window_size]
         self.face_landback = MobileFaceNet([112, 112], 136)
-        face_landback_checkpoint = torch.load(r'C:\Users\86187\Desktop\posterv2\mixfacial\models\pretrain\mobilefacenet_model_best.pth.tar',
-                                              map_location=lambda storage, loc: storage)
-        self.face_landback.load_state_dict(face_landback_checkpoint['state_dict'])
+        mobilefacenet_path = os.path.join(os.path.dirname(__file__), 'pretrain', 'mobilefacenet_model_best.pth.tar')
+        if os.path.exists(mobilefacenet_path):
+            face_landback_checkpoint = torch.load(mobilefacenet_path, map_location=lambda storage, loc: storage)
+            self.face_landback.load_state_dict(face_landback_checkpoint['state_dict'])
+        else:
+            print(f"Warning: MobileFaceNet checkpoint not found at {mobilefacenet_path}, using untrained weights")
 
         for param in self.face_landback.parameters():
             param.requires_grad = False
@@ -257,9 +261,12 @@ class pyramid_trans_expr2(nn.Module):
         self.VIT = VisionTransformer(depth=2, embed_dim=embed_dim)
 
         self.ir_back = Backbone(50, 0.0, 'ir')
-        ir_checkpoint = torch.load(r'C:\Users\86187\Desktop\posterv2\mixfacial\models\pretrain\ir50.pth', map_location=lambda storage, loc: storage)
-
-        self.ir_back = load_pretrained_weights(self.ir_back, ir_checkpoint)
+        ir_path = os.path.join(os.path.dirname(__file__), 'pretrain', 'ir50.pth')
+        if os.path.exists(ir_path):
+            ir_checkpoint = torch.load(ir_path, map_location=lambda storage, loc: storage)
+            self.ir_back = load_pretrained_weights(self.ir_back, ir_checkpoint)
+        else:
+            print(f"Warning: IR50 checkpoint not found at {ir_path}, using untrained weights")
 
         self.attn1 = WindowAttentionGlobal(dim=dims[0], num_heads=num_heads[0], window_size=window_size[0])
         self.attn2 = WindowAttentionGlobal(dim=dims[1], num_heads=num_heads[1], window_size=window_size[1])

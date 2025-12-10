@@ -4,3 +4,6 @@ checkpoint
 
 # DS stores
 *.DS_Store
+
+# __pycache__
+models/__pycache__
