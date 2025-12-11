@@ -1,30 +1,26 @@
 # POSTER V2 - Taiwanese Dataset Evaluation Results
 
-Emotion Recognition Results for 郭婞淳's vlog: vlog_emo_recog_results.csv
+Emotion Recognition Results for 郭婞淳's vlog: `./vlog_emo_recog_results.csv`
 
 ## Model Selection Rationale
 
-### POSTER V2 (RAF-DB Pretrained)
-
 This study selected POSTER V2 (Pyramid Cross-Fusion Transformer V2) with RAF-DB pre-trained weights as the evaluation benchmark. The decision is based on three key dimensions:
 
-#### 1. Benchmark Performance & Technical Representation (SoTA Performance & Architecture)
+### 1. Benchmark Performance & Technical Representation (SoTA Performance & Architecture)
 
 - **Academically Recognized Benchmark Model**: According to Papers With Code benchmarks, POSTER V2 achieves approximately 92.21% accuracy on the RAF-DB dataset and has long held the State-of-the-Art (SoTA) position in the Facial Expression Recognition (FER) field.
 
-- **Advanced Transformer Architecture**: Compared to industry-standard but outdated architectures like DeepFace (CNN/VGG-based), POSTER V2 adopts a Vision Transformer (ViT) architecture combined with pyramid feature fusion and window-based cross-attention mechanisms. This represents the state-of-the-art in computer vision's ability to capture subtle facial features (e.g., eye muscle changes).
+- **Advanced Transformer Architecture**: Instead of using industry-standard architectures like DeepFace (CNN/VGG-based), whose cross-racial limitations are already documented (e.g., in "The cross-race effect in automatic facial expression recognition violates measurement invariance"), this study evaluates a modern, open-source State-of-the-Art (SoTA) model. POSTER V2, with its Vision Transformer (ViT) architecture combined with pyramid feature fusion and window-based cross-attention mechanisms, represents the current frontier in computer vision's ability to capture subtle facial features (e.g., eye muscle changes).
 
-- **Selection Rationale**: To verify the limits of emotion recognition technology, we must use the most capable algorithm available, not just an engineering tool. This ensures our results reflect the "technology boundary" rather than "tool limitations."
+### 2. Demographic Alignment Control (Demographic Alignment)
 
-#### 2. Demographic Alignment Control (Demographic Alignment)
+- **Addressing Western Demographic Bias**: Most general-purpose models (e.g., AffectNet-trained models) exhibit severe Western Caucasian sample bias. This study uses weights trained on RAF-DB (Real-world Affective Faces Database).
 
-- **Controlling Cross-Domain Bias**: Most general-purpose models (e.g., AffectNet-trained models) exhibit severe Western Caucasian sample bias. This study uses weights trained on RAF-DB (Real-world Affective Faces Database).
+- **RAF-DB's Enhanced Asian Representation**: RAF-DB was established by Asian academic institutions and contains substantial Asian faces with in-the-wild lighting variations.
 
-- **Asian-Optimized Features**: RAF-DB was established by Asian academic institutions and contains substantial Asian faces with in-the-wild lighting variations.
+- **Justification for Isolating Core Issues**: By utilizing a model pre-trained on RAF-DB, which includes substantial Asian facial data, we aim to mitigate potential biases arising from the underrepresentation of Asian features in typical training datasets. This control allows us to isolate the impact of "racial feature differences" as a confounding variable. Consequently, any observed performance degradation on our Taiwanese dataset can more robustly be attributed to deeper challenges, such as the inherent ambiguity of emotion definitions or cultural contextual nuances, rather than a mere lack of exposure to Asian facial phenotypes during model training.
 
-- **Selection Rationale**: Using this model minimizes "racial feature differences" as confounding variables. If the model still fails on Asian samples, we can more powerfully argue that the core issue is "emotion definition itself" and "lack of context," not that the model hasn't seen Asian faces.
-
-#### 3. Experimental Design Strategy: Strong Adversarial Validation (Steel Man Argument)
+### 3. Experimental Design Strategy: Strong Adversarial Validation (Steel Man Argument)
 
 - **Establishing the Strongest Baseline**: This study examines systematic limitations of single-modality (image-based) and discrete classification (7-class categorical) approaches in handling human complex emotions.
 
@@ -34,24 +30,26 @@ This study selected POSTER V2 (Pyramid Cross-Fusion Transformer V2) with RAF-DB 
 
 ## Experiment Setup
 
-- **Model**: POSTER V2 (7-class RAF-DB pre-trained, 92.21% accuracy on RAF-DB)
-- **Dataset**: Taiwanese Facial Expression Database
+**Model**: POSTER V2 (7-class RAF-DB pre-trained, 92.21% accuracy on RAF-DB)
+
+### Dataset
+Taiwanese Facial Expression Database
   - Total images: 1,223
   - Image resolution: 256×256 → resized to 224×224
   - Classes: 6 (Angry, Disgusted, Fearful, Happy, Sad, Surprised)
+### Vlog Validation
+  - **Objective**: Qualitatively assess POSTER V2's capability to capture emotion dynamics in real-world, continuous video footage (郭婞淳's competition vlog).
+  - **Note**: This validation is performed without ground truth labels, focusing instead on observing the model's prediction patterns and temporal coherence in an unconstrained setting.
 - **Device**: MPS (Metal Performance Shaders on macOS)
 - **Batch Size**: 128
-- **Preprocessing**: 
+- **Preprocessing**:
   - Resize to 224×224
   - Normalize with ImageNet stats (mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-
 ## Ground Truth Source & Methodology
 
 ### Data Source Change: Voting-Based Labels
 
-**Original Approach**: Used `Image_info.xls` with `maxIntCategory` field (6 classes, no Neutral)
-
-**Improved Approach**: Used `voting.xls` voting results to generate ground truth (7 classes, including Neutral)
+Used `voting.xls` voting results to generate ground truth (7 classes, including Neutral)
 - Ground truth derived directly from multi-rater voting percentages
 - Used "highest voting percentage" emotion as ground truth label
 - Mapped `peace` field to `Neutral` class (corresponding to RAF-DB model's class 4)
@@ -140,90 +138,40 @@ Class Probabilities (remapped to alphabetical order):
 
 ---
 
-## Known Issues & Resolution
-
-### ✅ Label Mapping Bug (RESOLVED)
-
-**Original Problem**: 
-- RAF-DB model output index order: `[Surprise, Fear, Disgust, Happiness, Sadness, Anger, Neutral]`
-- Evaluation script assumed alphabetical order: `[Angry, Disgusted, Fearful, Happy, Neutral, Sad, Surprised]`
-- Result: Catastrophic 7.71% accuracy (worse than random chance)
-- Example: Model predicts "Sadness" (RAF-DB index 4) → Script records as "Neutral" (alphabetical index 4)
-
-**Root Cause**:
-- Model was trained with RAF-DB's internal class ordering
-- Evaluation wrongly assumed alphabetical ordering without remapping
-- Classic "answer sheet filled in wrong cells" bug
-
-**Solution Implemented**:
-
-1. **Ground Truth Source**: Switched from `Image_info.xls` → `voting.xls`
-   - `voting.xls` contains voting percentages from multiple raters for each emotion
-   - Ground truth determined by **highest voting percentage** (more transparent than `maxIntCategory`)
-   - `peace` column mapped to `Neutral` class (representing calm/no-expression state)
-   
-2. **Label Remapping**: Added RAF-DB→Alphabetical conversion
-```python
-RAFDB_TO_ALPHA_MAPPING = {
-    0: 6,  # Surprise → Surprised
-    1: 2,  # Fear → Fearful
-    2: 1,  # Disgust → Disgusted
-    3: 3,  # Happiness → Happy
-    4: 5,  # Sadness → Sad
-    5: 0,  # Anger → Angry
-    6: 4   # Neutral → Neutral (from 'peace' in voting.xls)
-}
-```
-
-**Why `peace` as `Neutral`**:
-- In the Taiwanese dataset, "peace" represents participants' perception of calm/neutral expression
-- Aligns with RAF-DB's "Neutral" class definition (absence of strong emotion)
-- Enables 7-class evaluation matching model's output space
-
-**Verification**:
-- Debug example 0201a11.jpg: Now correctly predicts **Sad (96.39%)** instead of false "Neutral"
-- Debug example 0121b02.jpg: Correctly predicts **Happy (66.56%)**
-- Full dataset re-evaluation in progress with corrected mapping
-
-**Impact**:
-- ✅ Predictions now align with correct label space
-- ✅ Ground truth from voting consensus (more robust than single annotation)
-- ✅ Neutral class properly represented (9.2% of dataset from voting)
-- ✅ Enables fair cross-dataset analysis
-- ✅ Transforms "7% failure" into "legitimate domain shift analysis"
-
----
-
 ## Full Dataset Evaluation Results
 
 ### Overall Metrics
 
-```
-Total samples: 1,232
-Number of classes: 7
-Accuracy: 38.72%
-F1-Score (weighted): 0.3382
-```
+| Metric            | Value   |
+|-------------------|---------|
+| Total samples     | 1,232   |
+| Number of classes | 7       |
+| Accuracy          | 38.72%  |
+| F1-Score (weighted)| 0.3382  |
 
 **Significant Improvement**: From 7.71% → 38.72% after correcting label mapping bug
 
 ### Classification Report
 
-```
-              precision    recall  f1-score   support
+All the emotions:
 
-       Angry       0.41      0.53      0.46       231
-   Disgusted       0.21      0.26      0.23       179
-     Fearful       0.00      0.00      0.00        29
-       Happy       1.00      0.03      0.06       238
-     Neutral       1.00      0.01      0.02       113
-         Sad       0.33      0.80      0.46       225
-   Surprised       0.88      0.55      0.68       217
+| Emotion     | Precision | Recall | F1-Score | Support |
+|-------------|-----------|--------|----------|---------|
+| Angry       | 0.41      | 0.53   | 0.46     | 231     |
+| Disgusted   | 0.21      | 0.26   | 0.23     | 179     |
+| Fearful     | 0.00      | 0.00   | 0.00     | 29      |
+| Happy       | 1.00      | 0.03   | 0.06     | 238     |
+| Neutral     | 1.00      | 0.01   | 0.02     | 113     |
+| Sad         | 0.33      | 0.80   | 0.46     | 225     |
+| Surprised   | 0.88      | 0.55   | 0.68     | 217     |
 
-    accuracy                           0.39      1232
-   macro avg       0.55      0.31      0.27      1232
-weighted avg       0.61      0.39      0.34      1232
-```
+Metrics:
+
+| Emotion     | Precision | Recall | F1-Score | Support |
+|-------------|-----------|--------|----------|---------|
+| **Accuracy**|           |        | 0.39     | 1232    |
+| **Macro Avg**| 0.55      | 0.31   | 0.27     | 1232    |
+| **Weighted Avg**| 0.61      | 0.39   | 0.34     | 1232    |
 
 ### Per-Class Performance
 
@@ -251,29 +199,23 @@ weighted avg       0.61      0.39      0.34      1232
 
 ### Key Observations
 
-1. **Dramatic Improvement After Bug Fix**
-   - Before: 7.71% accuracy (worse than random)
-   - After: 38.72% accuracy (reasonable domain shift)
-   - **Gap from RAF-DB**: -53.49 percentage points
-   - Confirms **systematic domain shift**, not model failure
-
-2. **Success Cases (>50% accuracy)**
+1.  **Success Cases (>50% accuracy)**
    - **Sad**: 80.00% accuracy (180/225) — Best performing class
    - **Surprised**: 55.30% accuracy (120/217) — Strong performance
    - **Angry**: 52.81% accuracy (122/231) — Moderate success
    - **Pattern**: Model recognizes high-intensity negative emotions
 
-3. **Complete Failure**
+2. **Complete Failure**
    - **Fearful**: 0% accuracy (0/29) — All misclassified
    - **Happy**: 2.94% accuracy (7/238) — Near total failure
    - **Neutral**: 0.88% accuracy (1/113) — Almost never predicted
 
-4. **Confusion Patterns**
+3. **Confusion Patterns**
    - **Sad dominates predictions**: 180/225 actually-Sad correctly classified; many other emotions confused as Sad (52 Angry, 77 Disgusted, 101 Happy, 67 Neutral → Sad)
    - **Happy/Neutral rarely predicted**: Even when they should be, model defaults to stronger emotions
    - **Fearful indistinguishable**: Model cannot separate fear from sadness (23/29 Fearful → Sad)
 
-### 5. **Precision vs Recall Trade-off: The "Conservative Sniper" Pattern**
+4. **Precision vs Recall Trade-off: The "Conservative Sniper" Pattern**
 
 | Emotion | Precision | Recall | Interpretation |
 |---------|-----------|--------|-----------------|
@@ -312,60 +254,46 @@ weighted avg       0.61      0.39      0.34      1232
 
 ## Analysis & Implications
 
-### Cross-Domain Generalization Gap (38.72% vs 92.21%)
+Despite the model's State-of-the-Art performance on its training dataset (RAF-DB) and rigorous controls for demographic bias, applying it to the Taiwanese Facial Expression Database revealed a **significant cross-domain generalization gap**. The model's accuracy dropped dramatically from 92.21% (on RAF-DB) to 38.72% (on Taiwanese data), a performance gap of -53.49 percentage points. This extensive analysis confirms a **legitimate domain shift**, rather than a mere technical error.
 
-Despite being trained on RAF-DB (which includes Asian faces), the model shows significant performance degradation on Taiwanese dataset:
-- **RAF-DB accuracy**: 92.21%
-- **Taiwanese accuracy**: 38.72%
-- **Performance gap**: -53.49 percentage points
+### Critical Implications for Cross-Cultural Emotion Recognition
 
-This is a **legitimate domain shift**, not a model bug (as confirmed by fixing the label mapping).
+#### 1. The Domain Shift is Real and Substantial
 
-**Possible explanations for the 53% gap**:
+The observed 53.49 percentage point performance drop clearly demonstrates that models, even those pre-trained with relevant demographic data, do not seamlessly transfer across distinct cultural contexts. This is a fundamental challenge that needs to be addressed when deploying emotion AI globally.
 
-1. **Expression Intensity Differences**
-   - Taiwanese performers may use more subtle, reserved expressions compared to RAF-DB
-   - Supports cultural hypothesis: East Asian cultures tend to suppress emotional displays
-   - Evidence: Sad (80% accuracy) > Surprised (55%) > Angry (53%) — intensity hierarchy
+#### 2. Not All Emotions Transfer Equally: A Spectrum of Recognition Failure
 
-2. **Performance Type**
-   - Taiwanese uses theatrical, FACS-coded, and personal-event performances
-   - RAF-DB likely emphasizes exaggerated expressions for clarity
-   - Model trained on stronger expressions struggles with subtler ones
+Our analysis reveals a highly uneven transferability of emotions. While some emotions show moderate recognition, others exhibit near-total failure, indicating that the model's learned feature associations are selectively misaligned with Taiwanese expressions.
 
-3. **Fearful-Sad Confusion**
-   - Model cannot distinguish fear (0% accuracy) from sadness
-   - Both are high-intensity negative emotions with similar facial features
-   - May require finer facial action unit (AU) discrimination than model learned
+Possible explanations for this differential transferability include:
 
-4. **Happy Recognition Failure**
-   - Happy has only 2.94% accuracy (7/238 correct)
-   - But high precision (1.00) — when model predicts Happy, it's right
-   - Suggests: Model learned a narrow definition of "happy" smile that misses Taiwanese variants
+-   **Expression Intensity Differences**: Taiwanese performers may use more subtle, reserved expressions compared to the often exaggerated displays in datasets like RAF-DB. This supports the hypothesis that East Asian cultures tend to suppress overt emotional displays, which the model struggles to interpret.
+    -   *Evidence*: The model performs better on high-intensity negative emotions (Sad: 80%, Surprised: 55%, Angry: 53%) than on low-intensity or nuanced expressions.
 
-### The "Sad Default" Hypothesis
+-   **Performance Type**: The Taiwanese dataset incorporates theatrical, FACS-coded, and personal-event performances, which differ significantly from the more candid, "in-the-wild" lighting variations emphasized in RAF-DB. A model trained on stronger, natural expressions may struggle with the specific nuances of performed or culturally distinct expressions.
 
-Model shows strong bias toward predicting Sad:
-- 80% recall for Sad (catches most actual sad faces)
-- But low precision (0.33) — predicts Sad even when it shouldn't
-- 52 Angry, 77 Disgusted, 101 Happy → misclassified as Sad
+-   **Happy Recognition Failure**: The model exhibits near-total failure in recognizing happiness (only 2.94% accuracy). Although it achieves perfect precision (1.00) when it *does* predict Happy, this indicates an extremely narrow and rigid definition of happiness that misses the vast majority of Taiwanese variants.
 
-**Interpretation**: 
-- Model learns Sad as a "safe default" for ambiguous negative expressions
-- Reflects training data distribution where Sad might be common
-- Explains why Sad is the most recognizable class across domains
+#### 3. Discrete Categories May Be Insufficient: Overlap and "Sad Default" Bias
 
-### Implications for Cross-Cultural Emotion Recognition
+The model's confusion patterns suggest that its learned discrete emotion categories may be insufficient to capture the complexity and overlap of human emotions, particularly across cultures.
 
-1. **Domain Shift is Real and Substantial** (+30 percentage points from bug fix, but -53 from RAF-DB)
-2. **Not All Emotions Transfer Equally** (Sad: 80% → Happy: 3%)
-3. **Discrete Categories May Be Insufficient** (Complete failure on Fearful suggests categories overlap)
-4. **Cultural Expression Norms Matter** (Model trained on exaggerated expressions, struggles with reserved Asian expressions)
+-   **Fearful-Sad Confusion**: The model demonstrates complete inability to distinguish fear from sadness (0% accuracy for Fearful). Both are high-intensity negative emotions, but the model likely requires finer facial action unit (AU) discrimination than it has learned.
 
-## Case Study: The "Sad Happiness" Paradox (0111b01.jpg)
+-   **The "Sad Default" Hypothesis**: A strong bias towards predicting "Sad" emerges. With an 80% recall for Sad but low precision (0.33), the model frequently misclassifies other emotions (e.g., 52 Angry, 77 Disgusted, 101 Happy, 67 Neutral faces) as Sad. This suggests "Sad" acts as a "safe default" for ambiguous negative expressions, reflecting either training data distribution or a learned association for general facial tension.
 
-### Critical Data Point
+#### 4. Cultural Expression Norms Matter: The Core Alignment Problem
 
+Ultimately, the observed generalization gap points to a fundamental mismatch arising from cultural expression norms. The model, while robust within its training context, struggles with the specific ways emotions are expressed and interpreted in a distinct cultural setting. This implies that emotional AI cannot be simply deployed universally; it requires careful consideration of the target culture's emotional "codebook."
+
+### Case Study: The "Sad Happiness" Paradox (0111b01.jpg)
+
+This critical case study illustrates a profound cognitive misalignment between the model and human perception of emotion.
+
+#### 1. The Paradoxical Misclassification
+
+A pivotal sample, `0111b01.jpg`, presents a striking paradox:
 ```
 Sample: 0111b01.jpg
 Ground Truth: Happy (index 3) — Consensus from 400+ Taiwanese raters
@@ -376,192 +304,47 @@ Model's Probabilistic Interpretation:
   Happy:    0.0041 (0.41%) — Rejected
   Sad:      0.9717 (97.17%) — Confident prediction
 ```
+This is not merely ambiguity; it is a **confident misclassification** where the model assigns the exact opposite of human consensus with near-certainty. The ground truth, established by over 400 Taiwanese raters, confirms this expression is unambiguously "Happy" to human observers.
 
-**This is not ambiguity. This is confident misclassification.**
+#### 2. Contrasting Perceptions: Human vs. AI
 
-### The Critical Insight: Cognitive Misalignment, Not Expression Ambiguity
+This confident misclassification reveals two radically different interpretations of the same visual input:
 
-**Previous Hypothesis (Rejected)**: "The expression is too exaggerated/unusual, so the model misunderstands it."
+**Human Perception (Taiwanese Baseline)**: For Taiwanese observers, features like "squinted eyes + facial muscle tension + mouth smile" reliably code for *genuine happiness (Duchenne smile)*. This is a culturally-recognizable expression of joy with high consensus among raters.
 
-**New Finding (Validated)**: Since Ground Truth is determined by **400+ Taiwanese raters voting on voting.xls**, this represents authentic human consensus that **Taiwanese observers clearly recognize this as happiness**. Therefore, the error reveals something more profound.
+**Model Perception (POSTER V2/RAF-DB)**: Conversely, the model interprets the same "squinted eyes + facial muscle tension + mouth smile" features as *suffering or pain*. Its learned statistical associations, derived from RAF-DB training, map this feature cluster to "Sad," resulting in a 97.17% confident prediction. The model cannot parse this sensory input as joy.
 
-### Two Radically Different Perceptions of the Same Face
+#### 3. The Core Problem: Missing the Cultural Codebook
 
-#### **Human Perception (Taiwanese Baseline)**
+This isn't a problem of:
+- ❌ Insufficient general Asian data in training.
+- ❌ Exaggerated performance or technical errors.
 
-```
-Visual Input: Squinted eyes + facial muscle tension + mouth smile
-Human Brain Processing: ✓ "This is genuine happiness (Duchenne smile)"
-Human Output: HAPPY
-Confidence: HIGH (consensus among 400+ raters)
-```
+Instead, it's a profound issue of **cultural cognitive misalignment**:
+- ✅ **Feature Semantic Drift**: The same facial feature cluster (e.g., intense eye crinkling with a smile) means fundamentally different things in different cultural contexts.
+- ✅ **Missing Cultural Training**: The model lacks the specific "cultural codebook" required to interpret Taiwanese emotional expressions accurately.
+- ✅ **Systematic Feature Misalignment**: Happiness-coding features in Taiwanese expressions are systematically mapped to suffering-related neurons in the model's architecture.
 
-**Meaning**: For Taiwanese observers, the cluster of features (eye-crinkling, facial tension, smile configuration) reliably codes for authentic joy. This is a **culturally-recognizable expression**.
+Even though RAF-DB includes Asian faces, these are primarily **candid, in-the-wild expressions** with natural smiles and relaxed facial muscles. A Taiwanese actor performing "maximum happiness" (as seen in the dataset) produces a distinct feature signature that the model, trained on different types of Asian expressions, fails to recognize as joy.
 
-#### **Model Perception (POSTER V2/RAF-DB)**
+#### 4. Validating the Hypothesis: The "Perfect Happy" Survivors
 
-```
-Visual Input: Squinted eyes + facial muscle tension + mouth smile
-Model Feature Extraction: Eye contraction + facial tension detected
-Model Statistical Association: These features → sadness/pain (from RAF-DB training)
-Model Output: SAD
-Confidence: 97.17%
-```
+To further validate our findings and understand the model's narrow definition of "Happy," we examined the 7 samples it *did* correctly classify as Happy. These "survivors" all exhibited **full-teeth smiles (broad grins)** with 96-100% human voting consensus, representing the most exaggerated and unambiguous happy expressions in the dataset.
 
-**Meaning**: The model's weights have learned that this exact feature cluster = suffering, not happiness. It cannot parse the same sensory input as joy.
+This "sanity check" confirms:
+- The label mapping is **correct**.
+- The problem is an **extreme recall bias** for Happy: the model demands an ultra-narrow, maximum-intensity definition of happiness (e.g., full-teeth smiles) and rejects 97% of valid Happy faces as "not happy enough," often misclassifying them as Sad, Disgusted, or Angry.
 
-### The Core Problem: Missing the Cultural Codebook
+#### 5. Broader Implications: AI-Human Semantic Inversion
 
-This is **not** a problem of:
-- ❌ Insufficient Asian data in training
-- ❌ Exaggerated performance
-- ❌ Technical preprocessing errors (verified: using PIL with RGB)
+This case study reveals a critical **alignment problem** between AI and human cognition, specifically in cross-cultural emotion recognition. The model's "value system" is fundamentally misaligned with Taiwanese emotion interpretation.
 
-This **is** a problem of:
-- ✅ **Feature Semantic Drift**: The same facial feature means different things in different cultural contexts
-- ✅ **Missing Cultural Training**: The model lacks the "cultural codebook" to interpret Taiwanese emotional expressions
-- ✅ **Systematic Feature Misalignment**: Without Taiwanese-specific training, happiness-coding features get mapped to suffering-related neurons
+This isn't merely an "accuracy drop"; it's **semantic inversion**. The model doesn't just fail; it *confidently misinterprets* genuine emotions as their opposites. This qualitative failure mode is far more dangerous for real-world applications, risking:
+- Misdiagnosis in mental health.
+- Incorrect assessment in customer service or educational systems.
+- Potentially dangerous misidentification in crisis intervention.
 
-### Why RAF-DB's Asian Data Doesn't Solve This
-
-RAF-DB includes Asian faces, but they are **candid/in-the-wild expressions**:
-- Natural smiles with relaxed facial muscles
-- Spontaneous rather than performed emotions
-- Different feature distributions than theatrical expressions
-
-A Taiwanese actor **performing maximum happiness** produces a different feature signature than:
-- An Asian person naturally smiling at a friend
-- A Western actor performing happiness
-- A Westerner naturally smiling
-
-**Result**: Training on "how Asians naturally smile" fails on "how Taiwanese actors perform happiness."
-
-### Implications: The Perception Gap is the Real Problem
-
-| Dimension | Human (Taiwanese) | AI (RAF-DB trained) |
-|-----------|-------------------|----------------------|
-| Same visual input | ✓ Recognizes happiness | ✗ Interprets as sadness |
-| Feature interpretation | Eye crinkles = joy | Eye contraction = pain |
-| Confidence | Moderate (human uncertainty is normal) | 97.17% (false certainty) |
-| Cultural understanding | Implicit (lived experience) | Absent (not in training) |
-
-**The tragedy**: The model doesn't just fail—it fails with near-certainty, confidently assigning the wrong semantic label.
-
-### Deeper Analysis: Why Does the Model Contradict 400 Human Raters?
-
-Since we've ruled out data quality issues, we can now precisely characterize this as **"a conflict in feature interpretation between AI and human cognition"** — a critical **Alignment Problem**.
-
-#### The Human Truth (400-Rater Consensus)
-
-When 400 Taiwanese raters see "squinted eyes + teeth-showing," their neural networks recognize this as **"genuine happiness (Duchenne Smile)"**. This feature combination is reliably mapped to positive emotion in their learned cognitive distribution.
-
-#### The Model Bias (POSTER V2/RAF-DB)
-
-The same visual input (squinted eyes + teeth-showing) is interpreted by POSTER V2 as **"painful grimace"** with 97% confidence.
-
-#### What Does This Reveal?
-
-**The model's "value system" is fundamentally misaligned with Taiwanese emotion recognition.**
-
-The rule the model learned: *"Squinted eyes + facial tension = suffering/pain"*
-
-This rule may work in:
-- Western populations with different smile phenotypes
-- In-the-wild candid photos with naturally relaxed facial expressions
-- RAF-DB's original training context
-
-But it **directly contradicts** the collective cognitive consensus of 400 Taiwanese raters.
-
-#### The Critical Insight: This is an Alignment Failure, Not a Data Problem
-
-| Dimension | Human Cognition | Model Cognition |
-|-----------|-----------------|-----------------|
-| Input: Squinted eyes + teeth | Genuine smile (Duchenne) | Eye pain/suffering |
-| Confidence | Moderate (human variability normal) | 97.17% (false certainty) |
-| Basis | Lived cultural experience | Statistical patterns from Western/in-the-wild data |
-| Result | Happy prediction | Sad prediction |
-
-**The tragedy**: This isn't a case of model uncertainty or ambiguity. The model is *confidently wrong* about what Taiwanese people mean when they smile.
-
-#### Implications: AI-Human Misalignment as a Localization Risk
-
-This experiment proves: **When deploying SoTA emotion recognition AI to new populations, the primary risk is not accuracy degradation—it's semantic inversion.**
-
-The model doesn't just fail (e.g., 50% accuracy). It confidently misinterprets genuine emotion as its opposite, which is qualitatively more dangerous for real-world applications:
-
-- **Mental health applications**: Would diagnose happy Taiwanese users as depressed
-- **Customer service AI**: Would flag satisfied customers as upset
-- **Educational systems**: Would flag engaged students as distressed
-- **Crisis intervention**: Could dangerously misidentify emotional states
-
-### Broader Theoretical Implication
-
-This case study reveals a fundamental problem in applying Western-trained emotion recognition AI to non-Western populations:
-
-**It's not just "accuracy drops" — it's "semantic inversion".**
-
-When a model misclassifies Happy as Angry (confusion between related emotions), that's one problem. When it confidently inverts happiness to sadness with 97% confidence, that's a **qualitatively different and more dangerous failure mode**.
-
-### Sanity Check: The 7 "Perfect Happy" Survivors
-
-To validate that the label mapping is correct and understand the model's narrow definition of Happy, we extracted the 7 samples that the model correctly predicted as Happy.
-
-**The 7 Survivors** (from predictions_20251211_013516.csv):
-1. 0121b02
-2. 0931b11
-3. 1621b04
-4. 1621b05
-5. 1621b09
-6. 1631b06
-7. 1631b11
-
-**Voting Ground Truth Validation**:
-
-| Sample | Happy Voting % | Consensus Level |
-|--------|----------------|----------------|
-| 0121b02 | 100% | ✓ Unanimous |
-| 0931b11 | 99% | ✓ Near-unanimous |
-| 1621b04 | 98% | ✓ Strong consensus |
-| 1621b05 | 98% | ✓ Strong consensus |
-| 1621b09 | 99% | ✓ Near-unanimous |
-| 1631b06 | 99% | ✓ Near-unanimous |
-| 1631b11 | 96% | ✓ Strong consensus |
-
-**Average Happy voting consensus: 98.7%**
-
-**Visual Inspection Finding** ✅:
-All 7 survivors are **full-teeth smiles (broad grins)** — the most exaggerated, unambiguous happy expressions in the dataset.
-
-**Critical Implications**:
-
-1. ✅ **Label mapping is CORRECT**
-   - These 7 samples truly are Happy (96-100% voting consensus)
-   - Model correctly identified them using proper label order
-   - This definitively validates that index 3 = Happy (no mapping error)
-
-2. ✅ **The problem is EXTREME RECALL BIAS, not semantic confusion**
-   - Model demands 98.7% quality consensus to predict Happy
-   - Only accepts "maximum intensity" happy expressions
-   - Rejects 97% of Happy faces as "not happy enough"
-
-3. ✅ **Model learned an ultra-narrow definition of Happy**
-   - **Acceptance criterion**: Full-teeth smile + maximum facial intensity
-   - **Rejection criterion**: Subtle smiles, closed-mouth smiles, Duchenne smiles without visible teeth
-   - This is **not** a mapping bug — it's a **learned feature bias**
-
-4. ✅ **This explains the 231 "lost" Happy faces**
-   - 101 → Sad: Subtle/warm smiles with eye crinkles → model interprets as sadness
-   - 64 → Disgusted: Different lip configurations → mistaken for disgust
-   - 53 → Angry: Intense but not teeth-showing → mistaken for anger
-
-**The Mechanism**:
-- Model sees: "full-teeth smile" → classifies as Happy ✓
-- Model sees: "eye crinkles without visible teeth" → classifies as Sad ✗
-- Model sees: "warm expression without intense mouth opening" → classifies as other ✗
-
-This validates our core hypothesis: **the model has learned Western (teeth-showing, broad) smile conventions and rejects Asian/subtle smile variants as "not happy enough."**
-
----
+Deploying Western-trained emotion AI to non-Western populations without careful cultural adaptation carries the significant risk of such semantic inversion, rather than simple performance degradation.
 
 ---
 
@@ -783,18 +566,18 @@ img = cv2.imread(frame_path)  # ✗ BGR not RGB → causes color distortion
 
 Expected phenomena to observe:
 
-1. **Plateau of Sadness**: 
+- Plateau of Sadness: 
    - Model predicts Sad > 60% throughout video
    - Even during celebration moments, Sad remains high
    - Happy barely rises above 0.1
    - **Interpretation**: Proves systematic under-detection of happiness
 
-2. **Flickering & Instability**:
+- Flickering & Instability:
    - Sharp drops/spikes when athlete blinks or speaks
    - Model lacks temporal context to smooth out frame-to-frame noise
    - **Evidence**: Image-based models are fundamentally unsuitable for video analysis
 
-3. **Neutral Avoidance**:
+- Neutral Avoidance:
    - Neutral probability stays near 0 throughout
    - Model avoids committing to neutral expression even during rest frames
    - **Implication**: Model learned Neutral is "risky"
@@ -845,15 +628,15 @@ This real-world video analysis demonstrates:
 
 **Why This Matters**:
 
-1. **Uniform Distribution = Complete Confusion**: All emotions cluster near 17% (random is 14%), proving the model has learned no reliable features for intense effort expressions
-2. **Angry ≠ Struggle**: The model equates "facial muscles tensed" with "angry," missing the context that this is muscular exertion, not emotional anger
-3. **No Context Integration**: A human would use video continuity (pre-lift → struggle → relief → celebration) to understand frame 0005 as "athletic effort," but the model sees only this frozen moment
+- **Uniform Distribution = Complete Confusion**: All emotions cluster near 17% (random is 14%), proving the model has learned no reliable features for intense effort expressions
+- **Angry ≠ Struggle**: The model equates "facial muscles tensed" with "angry," missing the context that this is muscular exertion, not emotional anger
+- **No Context Integration**: A human would use video continuity (pre-lift → struggle → relief → celebration) to understand frame 0005 as "athletic effort," but the model sees only this frozen moment
 
 **Conclusion**: Even in video form (where temporal context is theoretically available), the image-based model fails to recognize that human facial musculature conveys multiple distinct meanings across cultures and contexts. This is not a technical bug but a **fundamental semantic mismatch**.
 
 ---
 
-## 4.3 Full Video Analysis Results
+## Full Video Analysis Results
 
 ### Execution Command
 ```bash
