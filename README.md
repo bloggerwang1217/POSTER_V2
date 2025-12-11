@@ -709,5 +709,5 @@ In this video, the model:
 
 ---
 
-**Generated**: 2025-12-10
-**Last Updated**: 2025-12-11
+- **Generated**: 2025-12-10
+- **Last Updated**: 2025-12-11
