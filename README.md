@@ -1,5 +1,7 @@
 # POSTER V2 - Taiwanese Dataset Evaluation Results
 
+Emotion Recognition Results for 郭婞淳's vlog: vlog_emo_recog_results.csv
+
 ## Model Selection Rationale
 
 ### POSTER V2 (RAF-DB Pretrained)
